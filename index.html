@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>选购助手 - 图片搜索</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: linear-gradient(135deg, #fff0f7 0%, #f9f6ff 100%);
+            font-family: 'PingFang SC', 'Hiragino Sans GB', Arial, sans-serif;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* ── 顶部搜索条 ── */
+        .search-bar {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .search-bar .logo {
+            font-size: 1.8rem;
+            color: #ff69b4;
+            font-weight: bold;
+            letter-spacing: 3px;
+            margin-bottom: 4px;
+        }
+        .search-bar .slogan {
+            font-size: 0.82rem;
+            color: #b36ac8;
+            margin-bottom: 12px;
+        }
+
+        .search-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .search-row input {
+            width: 360px;
+            padding: 10px 16px;
+            border: 1.5px solid #ffb6d5;
+            border-radius: 22px;
+            font-size: 1rem;
+            outline: none;
+            background: #fff;
+        }
+        .search-row input:focus { border-color: #ff69b4; }
+        .search-row button {
+            background: linear-gradient(90deg, #ff69b4 0%, #b36ac8 100%);
+            color: #fff;
+            border: none;
+            border-radius: 22px;
+            padding: 10px 24px;
+            font-size: 1rem;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .search-row button:hover { transform: scale(1.03); }
+        .search-row button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        .upload-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 8px;
+            font-size: 0.8rem;
+            color: #b36ac8;
+        }
+        .upload-row input[type=file] { display: none; }
+        .upload-row .upload-btn {
+            cursor: pointer;
+            color: #ff69b4;
+            border: 1px dashed #ffb6d5;
+            padding: 3px 14px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            background: #fff;
+        }
+        .upload-row .clear-img {
+            cursor: pointer;
+            color: #999;
+            border: none;
+            background: none;
+            font-size: 1.1rem;
+            display: none;
+        }
+        #previewThumb {
+            width: 40px; height: 40px;
+            border-radius: 8px;
+            object-fit: cover;
+            display: none;
+        }
+        .toggle-row {
+            margin-top: 6px;
+            font-size: 0.76rem;
+            color: #b36ac8;
+        }
+        .toggle-row label { cursor: pointer; margin-right: 16px; }
+
+        /* ── 已选对比栏（吸顶） ── */
+        #compareBar {
+            display: none;
+            position: sticky;
+            top: 8px;
+            z-index: 100;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 2px 16px #f9c6e6c0;
+            padding: 12px 20px;
+            margin-bottom: 16px;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        #compareBar.show { display: flex; }
+        #compareBar .sel-count {
+            color: #ff69b4;
+            font-weight: bold;
+            font-size: 0.95rem;
+            white-space: nowrap;
+        }
+        #compareBar .sel-tags {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            flex: 1;
+        }
+        #compareBar .sel-tag {
+            background: #ffe0f0;
+            color: #b36ac8;
+            border-radius: 12px;
+            padding: 3px 10px;
+            font-size: 0.75rem;
+            max-width: 140px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+        #compareBar .sel-tag:hover { background: #ffb6d5; color: #fff; }
+        #compareBar .sel-tag::after { content: ' ×'; font-size: 0.9rem; }
+        .btn-compare {
+            background: linear-gradient(90deg, #ff69b4 0%, #b36ac8 100%);
+            color: #fff;
+            border: none;
+            border-radius: 18px;
+            padding: 8px 22px;
+            font-size: 0.88rem;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .btn-compare:hover { transform: scale(1.03); }
+        .btn-clear-sel {
+            background: none;
+            border: 1px solid #ddd;
+            color: #999;
+            border-radius: 14px;
+            padding: 5px 14px;
+            font-size: 0.78rem;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        /* ── 加载 ── */
+        #loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            color: #b36ac8;
+        }
+        .loading-spin {
+            display: inline-block;
+            width: 32px; height: 32px;
+            border: 3px solid #ffe0f0;
+            border-top-color: #ff69b4;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── 瀑布流 ── */
+        #imageResults {
+            display: none;
+        }
+        #imageResults .info-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding: 0 4px;
+        }
+        .info-bar .count { color: #b36ac8; font-size: 0.88rem; }
+
+        .waterfall {
+            column-count: 5;
+            column-gap: 10px;
+        }
+        @media (max-width: 1100px) { .waterfall { column-count: 4; } }
+        @media (max-width: 850px)  { .waterfall { column-count: 3; } }
+        @media (max-width: 600px)  { .waterfall { column-count: 2; } }
+
+        .img-card {
+            break-inside: avoid;
+            margin-bottom: 10px;
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 8px #f9c6e6a0;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+            position: relative;
+            border: 3px solid transparent;
+        }
+        .img-card:hover { transform: translateY(-2px); box-shadow: 0 3px 14px #f9c6e6c0; }
+        .img-card.selected {
+            border-color: #ff69b4;
+            box-shadow: 0 0 0 3px rgba(255,105,180,0.18), 0 3px 16px #f9c6e6c0;
+        }
+        .img-card .check-badge {
+            display: none;
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #ff69b4;
+            color: #fff;
+            font-size: 0.8rem;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+        }
+        .img-card.selected .check-badge { display: flex; }
+
+        .img-card img {
+            width: 100%;
+            display: block;
+            background: #f5f0fa;
+            min-height: 80px;
+            object-fit: cover;
+        }
+        .img-card .card-info {
+            padding: 8px 10px;
+        }
+        .img-card .card-title {
+            font-size: 0.76rem;
+            color: #555;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+        .img-card .card-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .img-card .card-platform {
+            font-size: 0.62rem;
+            padding: 1px 6px;
+            border-radius: 6px;
+            background: #ffe0f0;
+            color: #ff69b4;
+        }
+        .img-card .card-buy {
+            font-size: 0.65rem;
+            color: #b36ac8;
+            text-decoration: underline;
+            cursor: pointer;
+            z-index: 5;
+        }
+        .img-card .card-buy:hover { color: #ff69b4; }
+
+        /* ── 深度分析面板 ── */
+        #chatPanel {
+            display: none;
+            margin-top: 20px;
+            background: #fff8fc;
+            border-radius: 20px;
+            box-shadow: 0 2px 20px #f9c6e6a0;
+            overflow: hidden;
+        }
+        #chatPanel .chat-header {
+            background: linear-gradient(90deg, #ff69b4 0%, #b36ac8 100%);
+            color: #fff;
+            padding: 12px 20px;
+            font-size: 1rem;
+            text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #chatPanel .chat-header .close-btn {
+            background: rgba(255,255,255,0.3);
+            border: none;
+            color: #fff;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        #messages {
+            min-height: 200px;
+            max-height: 500px;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .msg {
+            max-width: 88%;
+            padding: 10px 14px;
+            border-radius: 14px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+        .msg.user {
+            align-self: flex-end;
+            background: linear-gradient(135deg, #ff69b4 0%, #ff8ec6 100%);
+            color: #fff;
+        }
+        .msg.assistant {
+            align-self: flex-start;
+            background: #f5e6ff;
+            color: #5a3a6e;
+        }
+        .product-card {
+            background: #fff;
+            border: 1px solid #ffd6ee;
+            border-radius: 10px;
+            padding: 10px;
+            margin: 6px 0;
+            font-size: 0.8rem;
+        }
+        .product-card .medal { font-size: 1.1rem; }
+        .product-card .price { color: #ff69b4; font-weight: bold; font-size: 1.05rem; }
+        .product-card .score { color: #b36ac8; font-weight: bold; }
+
+        /* ── 对比表格 ── */
+        .compare-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 12px 0;
+            font-size: 0.82rem;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 12px #f0d6eea0;
+        }
+        .compare-table th.col-header {
+            background: linear-gradient(135deg, #ff69b4 0%, #b36ac8 100%);
+            color: #fff;
+            padding: 10px 10px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.88rem;
+            min-width: 80px;
+        }
+        .compare-table th.row-label {
+            background: #fdf2f7;
+            color: #b36ac8;
+            padding: 10px 10px;
+            text-align: left;
+            font-weight: 600;
+            white-space: nowrap;
+            border-bottom: 1px solid #ffe0f0;
+        }
+        .compare-table td.row-label {
+            background: #fdf2f7;
+            color: #b36ac8;
+            padding: 8px 10px;
+            text-align: left;
+            font-weight: 600;
+            white-space: nowrap;
+            border-bottom: 1px solid #ffe8f3;
+        }
+        .compare-table td.data-cell {
+            padding: 8px 10px;
+            text-align: center;
+            border-bottom: 1px solid #ffe8f3;
+            background: #fff;
+            transition: background 0.2s;
+        }
+        .compare-table tbody tr:hover td {
+            background: #fff5f9;
+        }
+        .compare-table tbody tr:hover td.row-label {
+            background: #fef0f5;
+        }
+
+        .confirm-box {
+            background: #fff;
+            border: 2px dashed #ffb6d5;
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin-top: 8px;
+            text-align: center;
+        }
+        .confirm-box button {
+            margin: 4px;
+            padding: 6px 18px;
+            font-size: 0.88rem;
+        }
+
+        .chat-input-row {
+            display: flex;
+            padding: 10px 16px;
+            gap: 8px;
+            border-top: 1px solid #ffe0f0;
+            background: #fff;
+        }
+        .chat-input-row input {
+            flex: 1;
+            padding: 8px 14px;
+            border: 1.5px solid #ffb6d5;
+            border-radius: 18px;
+            font-size: 0.88rem;
+            outline: none;
+        }
+        .chat-input-row button {
+            background: linear-gradient(90deg, #ff69b4 0%, #b36ac8 100%);
+            color: #fff;
+            border: none;
+            border-radius: 18px;
+            padding: 8px 18px;
+            font-size: 0.88rem;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+
+<!-- 搜索条 -->
+<div class="search-bar">
+    <div class="logo">🛒 选购助手</div>
+    <div class="slogan">点击选中商品 → 一键对比 → 聪明消费</div>
+    <div class="search-row">
+        <input id="input" placeholder="输入你想找的商品..." onkeydown="if(event.key==='Enter')doSearch()" />
+        <button id="searchBtn" onclick="doSearch()">🔍 搜图</button>
+    </div>
+    <div class="upload-row">
+        <label class="upload-btn" for="fileInput">📷 上传图片搜索</label>
+        <input type="file" id="fileInput" accept="image/*" onchange="handleFile(event)" />
+        <img id="previewThumb" />
+        <button class="clear-img" id="clearImg" onclick="clearImage()">×</button>
+        <span id="uploadHint" style="font-size:0.78rem;color:#b36ac8"></span>
+    </div>
+</div>
+
+<!-- 已选对比栏 -->
+<div id="compareBar">
+    <span class="sel-count" id="selCount">已选 0 件</span>
+    <div class="sel-tags" id="selTags"></div>
+    <button class="btn-compare" onclick="startCompare()">📊 对比所选</button>
+    <button class="btn-clear-sel" onclick="clearSelection()">清空</button>
+</div>
+
+<!-- 加载 -->
+<div id="loading">
+    <div class="loading-spin"></div>
+    <div>正在搜索商品图片...</div>
+</div>
+
+<!-- 瀑布流 -->
+<div id="imageResults">
+    <div class="info-bar">
+        <span class="count" id="resultCount"></span>
+        <span style="font-size:0.76rem;color:#aaa">💡 点击卡片选中商品，点击「🔗 购买」跳转平台</span>
+    </div>
+    <div class="waterfall" id="waterfall"></div>
+</div>
+
+<!-- 深度分析面板 -->
+<div id="chatPanel">
+    <div class="chat-header">
+        <span>📊 商品对比分析</span>
+        <button class="close-btn" onclick="document.getElementById('chatPanel').style.display='none'">×</button>
+    </div>
+    <div id="messages"></div>
+    <div class="chat-input-row">
+        <input id="chatInput" placeholder="追问更多细节..." onkeydown="if(event.key==='Enter')sendFollowUp()" />
+        <button onclick="sendFollowUp()">发送</button>
+    </div>
+</div>
+
+<script>
+    let sessionId = localStorage.getItem('xuangou_sid');
+    if (!sessionId) {
+        sessionId = 'sid_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+        localStorage.setItem('xuangou_sid', sessionId);
+    }
+
+    let imageBase64 = null;
+    let allImages = [];       // 当前搜索结果
+    let selectedSet = new Set();   // 选中的 index
+    let lastKeyword = '';
+
+    // ── 搜索 ──
+    async function doSearch() {
+        const input = document.getElementById('input');
+        const message = input.value.trim();
+        if (!message && !imageBase64) return;
+
+        input.value = '';
+        document.getElementById('imageResults').style.display = 'none';
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('searchBtn').disabled = true;
+        clearSelection();
+
+        try {
+            const body = { session_id: sessionId, message: message || '请识别图片中的商品' };
+            if (imageBase64) body.image_url = 'data:image/jpeg;base64,' + imageBase64;
+
+            const resp = await fetch('/api/search-images', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await resp.json();
+            lastKeyword = data.keyword || message;
+            allImages = data.images || [];
+            renderWaterfall(allImages);
+        } catch (e) {
+            alert('搜索失败: ' + e.message);
+        } finally {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('searchBtn').disabled = false;
+        }
+        clearImage();
+    }
+
+    // ── 瀑布流渲染 ──
+    function renderWaterfall(images) {
+        const wf = document.getElementById('waterfall');
+        wf.innerHTML = '';
+        document.getElementById('resultCount').textContent =
+            images.length > 0 ? `找到 ${images.length} 件商品` : '未找到商品图片';
+        document.getElementById('imageResults').style.display = 'block';
+
+        const platformMap = { taobao: '淘宝', jd: '京东', pdd: '拼多多' };
+
+        images.forEach((item, i) => {
+            const card = document.createElement('div');
+            card.className = 'img-card';
+            card.id = 'card-' + i;
+
+            // 点击卡片 → 选中/取消
+            card.addEventListener('click', function(e) {
+                // 如果点击的是购买链接则不触发选中
+                if (e.target.classList.contains('card-buy')) return;
+                toggleSelect(i);
+            });
+
+            const platformName = platformMap[item.platform] || '';
+            const thumbSrc = item.thumb_url || item.image_url || '';
+
+            card.innerHTML =
+                `<div class="check-badge">✓</div>` +
+                (thumbSrc
+                    ? `<img src="${thumbSrc}" alt="${item.title}" loading="lazy" onerror="this.style.display='none'" />`
+                    : `<div style="height:100px;background:#f5f0fa;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:2rem">📦</div>`) +
+                `<div class="card-info">` +
+                    `<div class="card-title">${item.title || '商品'}</div>` +
+                    `<div class="card-bottom">` +
+                        (platformName ? `<span class="card-platform">${platformName}</span>` : `<span></span>`) +
+                        (item.buy_link
+                            ? `<span class="card-buy" onclick="event.stopPropagation();window.open('${item.buy_link}','_blank','noopener')">🔗 购买</span>`
+                            : `<span></span>`) +
+                    `</div>` +
+                `</div>`;
+
+            // 恢复选中状态
+            if (selectedSet.has(i)) card.classList.add('selected');
+
+            wf.appendChild(card);
+        });
+
+        window.scrollTo({ top: document.getElementById('imageResults').offsetTop - 100, behavior: 'smooth' });
+    }
+
+    // ── 选中逻辑 ──
+    function toggleSelect(i) {
+        if (selectedSet.has(i)) {
+            selectedSet.delete(i);
+            const card = document.getElementById('card-' + i);
+            if (card) card.classList.remove('selected');
+        } else {
+            if (selectedSet.size >= 8) {
+                alert('最多选择8件商品进行对比');
+                return;
+            }
+            selectedSet.add(i);
+            const card = document.getElementById('card-' + i);
+            if (card) card.classList.add('selected');
+        }
+        updateCompareBar();
+    }
+
+    function clearSelection() {
+        selectedSet.clear();
+        document.querySelectorAll('.img-card.selected').forEach(c => c.classList.remove('selected'));
+        updateCompareBar();
+    }
+
+    function updateCompareBar() {
+        const bar = document.getElementById('compareBar');
+        const count = document.getElementById('selCount');
+        const tags = document.getElementById('selTags');
+
+        count.textContent = `已选 ${selectedSet.size} 件`;
+        tags.innerHTML = '';
+
+        const indices = Array.from(selectedSet).sort((a,b) => a-b);
+        indices.forEach(i => {
+            const tag = document.createElement('span');
+            tag.className = 'sel-tag';
+            tag.textContent = (allImages[i]?.title || '商品').substring(0, 15);
+            tag.onclick = function(e) {
+                e.stopPropagation();
+                toggleSelect(i);
+            };
+            tags.appendChild(tag);
+        });
+
+        if (selectedSet.size > 0) {
+            bar.classList.add('show');
+        } else {
+            bar.classList.remove('show');
+        }
+    }
+
+    // ── 跨平台对比分析 ──
+    async function startCompare() {
+        if (selectedSet.size === 0 && allImages.length === 0) return;
+
+        const panel = document.getElementById('chatPanel');
+        panel.style.display = 'block';
+        document.getElementById('messages').innerHTML = '';
+
+        let prompt;
+        if (selectedSet.size > 0) {
+            const items = Array.from(selectedSet).sort((a,b) => a-b).map(i => allImages[i]);
+
+            // 跨平台对比提示词
+            const productList = items.map((it, idx) => {
+                const pname = it.title.replace(/[-_−].*/, '').replace(/（.*）/, '').replace(/\(.*\)/, '').trim();
+                return `${idx+1}. 「${pname}」`;
+            }).join('\n');
+
+            prompt = `请对以下 ${items.length} 件商品做跨平台深度对比，每件商品都要在淘宝、京东、拼多多三个平台分别查找同款，对比以下维度：
+
+${productList}
+
+请严格按以下格式输出（每件商品一张独立的跨平台对比表，行=属性维度，列=平台名称）：
+
+---
+
+### 🔥 {商品名} — 跨平台对比
+
+| 对比维度 | 🛒 淘宝 | 🛍️ 京东 | 💰 拼多多 |
+|---------|--------|--------|---------|
+| **价格** | ¥xxx-xxx | ¥xxx-xxx | ¥xxx-xxx |
+| **材质** | xxx | xxx | xxx |
+| **做工** | xxx | xxx | xxx |
+| **上身体感** | xxx | xxx | xxx |
+| **好评率** | xx% | xx% | xx% |
+| **点赞率** | xx% | xx% | xx% |
+| **性价比评分** | ⭐x.x/10 | ⭐x.x/10 | ⭐x.x/10 |
+| **平台服务** | xxx | xxx | xxx |
+
+> 💡 一句话点评：xxx
+
+---
+
+### 🔗 购买链接
+- 🛒 淘宝: https://s.taobao.com/search?q=具体商品名
+- 🛍️ 京东: https://search.jd.com/Search?keyword=具体商品名
+- 💰 拼多多: https://mobile.yangkeduo.com/search_result.html?search_key=具体商品名
+
+---
+
+## 🏆 最终推荐
+（一句话：哪件在哪个平台最值得入手，为什么）`;
+        } else {
+            prompt = `请帮我综合分析「${lastKeyword}」，从淘宝、京东、拼多多三个平台分别找出最有竞争力的同款商品，对比价格、材质、做工、体感、好评率、性价比，帮我做出聪明的购买决策。用表格对比，附上各平台购买链接。`;
+        }
+
+        addMsg('user', `对比 ${selectedSet.size} 件商品（跨平台）`);
+        await doChat(prompt);
+        panel.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function doChat(message) {
+        document.getElementById('searchBtn').disabled = true;
+        try {
+            const resp = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId, message: message, scene: 'auto' })
+            });
+            const data = await resp.json();
+            renderChatResponse(data);
+        } catch (e) {
+            addMsg('assistant', '❌ 网络错误: ' + e.message);
+        } finally {
+            document.getElementById('searchBtn').disabled = false;
+        }
+    }
+
+    function sendFollowUp() {
+        const input = document.getElementById('chatInput');
+        const msg = input.value.trim();
+        if (!msg) return;
+        input.value = '';
+        addMsg('user', msg);
+        doChat(msg);
+    }
+
+    // ── 聊天渲染 ──
+    function addMsg(role, html) {
+        const div = document.createElement('div');
+        div.className = 'msg ' + role;
+        div.innerHTML = html;
+        const msgs = document.getElementById('messages');
+        msgs.appendChild(div);
+        msgs.scrollTop = msgs.scrollHeight;
+    }
+
+    function addProductCard(p, rank) {
+        const medals = ['🏆','🥈','🥉','4','5'];
+        const medal = medals[rank] || (rank+1);
+        const platformMap = { jd: '京东', taobao: '淘宝', pdd: '拼多多' };
+        const pn = platformMap[p.platform] || p.platform || '';
+        let h = `<div class="product-card">`;
+        h += `<span class="medal">${medal}</span> <b>${p.name}</b>`;
+        if (pn) h += ` <span style="color:#ff69b4;font-size:0.7rem">[${pn}]</span>`;
+        h += `<br><span class="price">¥${p.price.toFixed(0)}</span>`;
+        if (p.sales_count) h += ` | 📦${p.sales_count}件`;
+        if (p.good_rate) h += ` | 👍${(p.good_rate*100).toFixed(0)}%好评`;
+        h += `<br>`;
+        if (p.material) h += `🧵 ${p.material}<br>`;
+        if (p.workmanship) h += `🔧 ${p.workmanship}<br>`;
+        if (p.feel) h += `👕 ${p.feel}<br>`;
+        h += `⭐ 评分: <span class="score">${p.score}/10</span>`;
+        if (p.buy_link) h += `<br><a href="${p.buy_link}" target="_blank" rel="noopener">🔗 去购买</a>`;
+        h += `</div>`;
+        return h;
+    }
+
+    function confirmReply(msg) {
+        document.getElementById('chatInput').value = msg;
+        sendFollowUp();
+    }
+
+    function renderChatResponse(data) {
+        let text = markdownToHTML(data.content || '');
+        addMsg('assistant', text);
+
+        if (data.images && data.images.length > 0) {
+            const imgs = data.images.map(url => `<img src="${url}" style="max-width:200px;border-radius:10px;margin:4px" />`).join(' ');
+            addMsg('assistant', imgs);
+        }
+
+        if (data.products && data.products.length > 0) {
+            const cards = data.products.map((p, i) => addProductCard(p, i)).join('');
+            addMsg('assistant', '<div style="margin-top:6px">' + cards + '</div>');
+        }
+
+        if (data.need_confirm) {
+            const box = document.createElement('div');
+            box.className = 'confirm-box';
+            box.innerHTML = `
+                <p>${data.confirm_prompt || '这是你想要的吗？'}</p>
+                <button onclick="confirmReply('是')">是</button>
+                <button onclick="confirmReply('不对，换一个')">不对</button>
+            `;
+            document.getElementById('messages').appendChild(box);
+            box.scrollIntoView();
+        }
+    }
+
+    // ── 简易 Markdown → HTML（表格 + 加粗 + 链接 + 换行）──
+    function markdownToHTML(md) {
+        let lines = md.split('\n');
+        let result = [];
+        let inTable = false;
+        let tableRows = [];
+        let inCode = false;
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+
+            // 代码块
+            if (line.trim().startsWith('```')) {
+                inCode = !inCode;
+                continue;
+            }
+            if (inCode) continue;
+
+            // 表格分隔行 (|---|---|)
+            if (/^\|[\s\-:|]+\|$/.test(line.trim()) && tableRows.length === 1) {
+                inTable = true;
+                continue;
+            }
+
+            // 表格行
+            if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+                if (!inTable && tableRows.length === 0) {
+                    tableRows.push(line);
+                } else if (inTable) {
+                    tableRows.push(line);
+                } else {
+                    // 不在表格中，普通行
+                    result.push(processLine(line));
+                }
+                continue;
+            } else {
+                // 结束表格
+                if (inTable && tableRows.length > 1) {
+                    result.push(buildTable(tableRows));
+                    tableRows = [];
+                    inTable = false;
+                } else if (tableRows.length === 1 && !inTable) {
+                    // 孤立的表头行，回退
+                    result.push(processLine(tableRows[0]));
+                    tableRows = [];
+                    inTable = false;
+                }
+            }
+
+            result.push(processLine(line));
+        }
+
+        // 末尾表格
+        if (inTable && tableRows.length > 1) {
+            result.push(buildTable(tableRows));
+        } else if (tableRows.length === 1 && !inTable) {
+            result.push(processLine(tableRows[0]));
+        }
+
+        return result.join('<br>');
+    }
+
+    function processLine(line) {
+        // 加粗
+        line = line.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+        // 链接 [text](url)
+        line = line.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:#ff69b4">$1</a>');
+        // 纯 URL（淘宝/京东/拼多多）
+        line = line.replace(/(https?:\/\/[^\s]+(?:taobao|tmall|jd\.com|yangkeduo)[^\s]*)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#ff69b4">$1</a>');
+        return line;
+    }
+
+    function buildTable(rows) {
+        let html = '<table class="compare-table">';
+        // 表头
+        html += '<thead><tr>';
+        let headerCells = rows[0].split('|').filter(c => c.trim());
+        headerCells.forEach((c, idx) => {
+            html += `<th class="${idx === 0 ? 'row-label' : 'col-header'}">${processLine(c.trim())}</th>`;
+        });
+        html += '</tr></thead><tbody>';
+        // 数据行（斑马纹）
+        for (let r = 1; r < rows.length; r++) {
+            let cells = rows[r].split('|').filter(c => c.trim());
+            html += '<tr>';
+            cells.forEach((c, idx) => {
+                let cls = idx === 0 ? 'row-label' : 'data-cell';
+                html += `<td class="${cls}">${processLine(c.trim())}</td>`;
+            });
+            html += '</tr>';
+        }
+        html += '</tbody></table>';
+        return html;
+    }
+
+    // ── 图片上传 ──
+    function handleFile(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            imageBase64 = ev.target.result.split(',')[1];
+            document.getElementById('previewThumb').src = ev.target.result;
+            document.getElementById('previewThumb').style.display = 'inline';
+            document.getElementById('clearImg').style.display = 'inline';
+            document.getElementById('uploadHint').textContent = '图片已就绪';
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function clearImage() {
+        imageBase64 = null;
+        document.getElementById('previewThumb').src = '';
+        document.getElementById('previewThumb').style.display = 'none';
+        document.getElementById('clearImg').style.display = 'none';
+        document.getElementById('uploadHint').textContent = '';
+        document.getElementById('fileInput').value = '';
+    }
+</script>
+</body>
+</html>
